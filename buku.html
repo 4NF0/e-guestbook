@@ -1,0 +1,951 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Buku Tamu DPUPR Kota Tegal</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#5D5CDE',
+                    },
+                },
+            },
+            darkMode: 'class',
+        };
+    </script>
+    <style>
+        /* Modal animations */
+        .modal-overlay {
+            opacity: 0;
+            transition: opacity 0.3s ease-in-out;
+        }
+        .modal-overlay.active {
+            opacity: 1;
+        }
+        .modal-container {
+            transform: translateY(-50px);
+            opacity: 0;
+            transition: transform 0.3s ease-out, opacity 0.3s ease-out;
+        }
+        .modal-container.active {
+            transform: translateY(0);
+            opacity: 1;
+        }
+    </style>
+</head>
+<body class="bg-white dark:bg-gray-900 min-h-screen">
+    <div class="container mx-auto px-4 py-8">
+        <header class="mb-8 text-center">
+            <h1 class="text-3xl font-bold text-gray-800 dark:text-white">Buku Tamu DPUPR Kota Tegal</h1>
+            <p class="text-lg text-gray-600 dark:text-gray-300">Sistem Pencatatan Kunjungan Tamu</p>
+        </header>
+
+        <!-- Modal Overlay -->
+        <div id="loginModal" class="fixed inset-0 z-50 flex items-center justify-center hidden">
+            <div class="modal-overlay absolute inset-0 bg-black bg-opacity-50 dark:bg-opacity-70"></div>
+            <div class="modal-container relative bg-white dark:bg-gray-800 w-11/12 md:max-w-md mx-auto rounded-lg shadow-lg z-50 overflow-y-auto">
+                <!-- Modal Header -->
+                <div class="modal-header px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
+                    <h3 class="text-xl font-semibold text-gray-800 dark:text-white">Login Admin</h3>
+                    <button id="closeLoginModal" class="text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-white">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                </div>
+                
+                <!-- Modal Body -->
+                <div class="modal-body p-6">
+                    <form id="loginForm" class="space-y-4">
+                        <div>
+                            <label for="username" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Username</label>
+                            <input type="text" id="username" name="username" required class="w-full px-4 py-2 text-base border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-primary dark:bg-gray-700 dark:text-white">
+                        </div>
+                        
+                        <div>
+                            <label for="password" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Password</label>
+                            <input type="password" id="password" name="password" required class="w-full px-4 py-2 text-base border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-primary dark:bg-gray-700 dark:text-white">
+                        </div>
+                        
+                        
+                        <div id="loginError" class="text-red-500 dark:text-red-400 text-sm hidden"></div>
+                        
+                        <div class="flex justify-end">
+                            <button type="submit" class="bg-primary hover:bg-opacity-90 text-white px-6 py-2 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:ring-opacity-50 transition-all duration-200">
+                                Login
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Admin Controls - only visible when logged in -->
+        <div id="adminControls" class="bg-white dark:bg-gray-800 shadow-md rounded-lg p-4 mb-6 hidden">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center">
+                    <svg class="w-5 h-5 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path>
+                    </svg>
+                    <span class="font-medium text-gray-800 dark:text-white">Login sebagai: <span id="currentAdmin" class="font-semibold"></span></span>
+                </div>
+                <button id="logoutButton" class="px-3 py-1 text-sm bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 rounded-md text-gray-700 dark:text-gray-300 transition duration-200">
+                    Logout
+                </button>
+            </div>
+        </div>
+
+        <div class="bg-white dark:bg-gray-800 shadow-md rounded-lg p-6 mb-8">
+            <h2 class="text-xl font-semibold mb-4 text-gray-800 dark:text-white">Formulir Tamu</h2>
+            <form id="guestForm" class="space-y-4">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label for="name" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Nama Lengkap</label>
+                        <input type="text" id="name" name="name" required class="w-full px-4 py-2 text-base border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-primary dark:bg-gray-700 dark:text-white">
+                    </div>
+                    <div>
+                        <label for="institution" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Instansi/Asal</label>
+                        <input type="text" id="institution" name="institution" required class="w-full px-4 py-2 text-base border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-primary dark:bg-gray-700 dark:text-white">
+                    </div>
+                </div>
+                
+                <div>
+                    <label for="email" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Email</label>
+                    <input type="email" id="email" name="email" class="w-full px-4 py-2 text-base border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-primary dark:bg-gray-700 dark:text-white">
+                </div>
+                
+                <div>
+                    <label for="purpose" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Maksud Kunjungan</label>
+                    <textarea id="purpose" name="purpose" rows="3" required class="w-full px-4 py-2 text-base border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-primary dark:bg-gray-700 dark:text-white"></textarea>
+                </div>
+                
+                <div>
+                    <label for="photo" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Foto</label>
+                    <input type="file" id="photo" name="photo" accept="image/*" class="w-full text-base py-2 px-3 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-primary dark:bg-gray-700 dark:text-white file:mr-4 file:py-2 file:px-4 file:border-0 file:text-sm file:bg-primary file:text-white">
+                    <div id="photoPreview" class="mt-2 hidden">
+                        <img id="previewImage" class="h-40 object-cover rounded-md" alt="Preview">
+                    </div>
+                </div>
+                
+                <div class="flex justify-end">
+                    <button type="submit" class="bg-primary hover:bg-opacity-90 text-white px-6 py-2 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:ring-opacity-50 transition-all duration-200">
+                        Simpan Data
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- View Data Button (For non-admin users) -->
+        <div id="viewDataSection" class="bg-white dark:bg-gray-800 shadow-md rounded-lg p-6 mb-8 flex flex-col items-center justify-center">
+            <p class="text-gray-700 dark:text-gray-300 mb-4 text-center">Untuk melihat data tamu, silakan login sebagai admin/operator</p>
+            <button id="showLoginModal" class="bg-primary hover:bg-opacity-90 text-white px-6 py-2 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:ring-opacity-50 transition-all duration-200">
+                Login Admin
+            </button>
+        </div>
+
+        <div id="guestListSection" class="bg-white dark:bg-gray-800 shadow-md rounded-lg p-6 hidden">
+            <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 gap-4">
+                <h2 class="text-xl font-semibold text-gray-800 dark:text-white">Daftar Tamu</h2>
+                
+                <div class="flex flex-col md:flex-row gap-2 w-full md:w-auto">
+                    <div class="relative flex-grow">
+                        <input type="text" id="searchInput" placeholder="Cari tamu..." class="w-full px-4 py-2 pr-10 text-base border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-primary dark:bg-gray-700 dark:text-white">
+                        <div class="absolute inset-y-0 right-0 flex items-center pr-3">
+                            <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                            </svg>
+                        </div>
+                    </div>
+                    
+                    <button id="exportExcel" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md focus:outline-none focus:ring-2 focus:ring-green-600 focus:ring-opacity-50 flex items-center justify-center gap-2 whitespace-nowrap">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+                        </svg>
+                        Export Excel
+                    </button>
+                </div>
+            </div>
+            
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                    <thead class="bg-gray-50 dark:bg-gray-700">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">No</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Tanggal</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Foto</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Nama</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Instansi</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Email</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Tujuan</th>
+                        </tr>
+                    </thead>
+                    <tbody id="guestTableBody" class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                        <!-- Data will be populated by JavaScript -->
+                    </tbody>
+                </table>
+            </div>
+            
+            <div id="noData" class="text-center py-4 text-gray-500 dark:text-gray-400 hidden">
+                Belum ada data tamu
+            </div>
+            
+            <div class="mt-4 flex flex-col md:flex-row justify-between items-center">
+                <div class="text-sm text-gray-500 dark:text-gray-400 mb-2 md:mb-0">
+                    Menampilkan <span id="startIndex">0</span> hingga <span id="endIndex">0</span> dari <span id="totalItems">0</span> data
+                </div>
+                
+                <div class="flex space-x-2">
+                    <button id="prevPage" class="px-3 py-1 border border-gray-300 dark:border-gray-600 rounded-md text-sm text-gray-700 dark:text-gray-300 disabled:opacity-50 disabled:cursor-not-allowed">
+                        &laquo; Sebelumnya
+                    </button>
+                    <div id="pagination" class="flex space-x-1">
+                        <!-- Pagination buttons will be generated by JavaScript -->
+                    </div>
+                    <button id="nextPage" class="px-3 py-1 border border-gray-300 dark:border-gray-600 rounded-md text-sm text-gray-700 dark:text-gray-300 disabled:opacity-50 disabled:cursor-not-allowed">
+                        Selanjutnya &raquo;
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Dark mode detection and setting
+        if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+            document.documentElement.classList.add('dark');
+        }
+        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', event => {
+            if (event.matches) {
+                document.documentElement.classList.add('dark');
+            } else {
+                document.documentElement.classList.remove('dark');
+            }
+        });
+
+        // Database initialization
+        let db;
+        const DB_NAME = 'GuestBookDB';
+        const GUEST_STORE = 'guests';
+        const ADMIN_STORE = 'admins';
+        
+        // Authentication state
+        let isLoggedIn = false;
+        let currentAdmin = null;
+        
+        // Modal elements
+        const loginModal = document.getElementById('loginModal');
+        const modalOverlay = loginModal.querySelector('.modal-overlay');
+        const modalContainer = loginModal.querySelector('.modal-container');
+        
+        // Hardcoded admin credentials as fallback
+        const DEFAULT_ADMINS = [
+            { username: 'admin', password: 'admin123', name: 'Administrator' },
+            { username: 'operator', password: 'operator123', name: 'Operator' }
+        ];
+        
+        // Initialize the database
+        async function initDatabase() {
+            return new Promise((resolve, reject) => {
+                // Delete any existing database to start fresh
+                // This is only for testing, would not do this in production
+                /* 
+                const deleteRequest = indexedDB.deleteDatabase(DB_NAME);
+                deleteRequest.onsuccess = () => {
+                    console.log("Database deleted successfully");
+                };
+                */
+                
+                const request = indexedDB.open(DB_NAME, 1);
+                
+                request.onerror = (event) => {
+                    console.error("Database error:", event.target.error);
+                    reject("Couldn't open database");
+                };
+                
+                request.onsuccess = (event) => {
+                    db = event.target.result;
+                    console.log("Database opened successfully");
+                    
+                    // Check and create admin accounts if they don't exist
+                    ensureAdminAccounts().then(() => {
+                        resolve(db);
+                    }).catch(error => {
+                        console.error("Error ensuring admin accounts:", error);
+                        reject(error);
+                    });
+                };
+                
+                request.onupgradeneeded = (event) => {
+                    const db = event.target.result;
+                    
+                    // Create object store for guests
+                    if (!db.objectStoreNames.contains(GUEST_STORE)) {
+                        const guestStore = db.createObjectStore(GUEST_STORE, { keyPath: 'id', autoIncrement: true });
+                        guestStore.createIndex('date', 'date', { unique: false });
+                        guestStore.createIndex('name', 'name', { unique: false });
+                        console.log("Guest store created");
+                    }
+                    
+                    // Create object store for admin users
+                    if (!db.objectStoreNames.contains(ADMIN_STORE)) {
+                        const adminStore = db.createObjectStore(ADMIN_STORE, { keyPath: 'username' });
+                        console.log("Admin store created");
+                        
+                        // Add default admin accounts during database creation
+                        DEFAULT_ADMINS.forEach(admin => {
+                            adminStore.add(admin);
+                            console.log(`Added default admin: ${admin.username}`);
+                        });
+                    }
+                };
+            });
+        }
+        
+        // Ensure admin accounts exist
+        async function ensureAdminAccounts() {
+            // Check if admin accounts exist
+            try {
+                const transaction = db.transaction([ADMIN_STORE], 'readonly');
+                const store = transaction.objectStore(ADMIN_STORE);
+                const countRequest = store.count();
+                
+                return new Promise((resolve, reject) => {
+                    countRequest.onsuccess = () => {
+                        if (countRequest.result === 0) {
+                            // No admin accounts found, create them
+                            createDefaultAdmins().then(resolve).catch(reject);
+                        } else {
+                            console.log("Admin accounts exist");
+                            resolve();
+                        }
+                    };
+                    
+                    countRequest.onerror = (event) => {
+                        console.error("Error counting admin accounts:", event.target.error);
+                        reject(event.target.error);
+                    };
+                });
+            } catch (error) {
+                console.error("Error checking admin accounts:", error);
+                return createDefaultAdmins();
+            }
+        }
+        
+        // Create default admin accounts
+        async function createDefaultAdmins() {
+            try {
+                const transaction = db.transaction([ADMIN_STORE], 'readwrite');
+                const store = transaction.objectStore(ADMIN_STORE);
+                
+                return new Promise((resolve, reject) => {
+                    DEFAULT_ADMINS.forEach(admin => {
+                        const request = store.put(admin);
+                        request.onerror = (event) => {
+                            console.error(`Error adding admin ${admin.username}:`, event.target.error);
+                        };
+                    });
+                    
+                    transaction.oncomplete = () => {
+                        console.log("Default admin accounts created");
+                        resolve();
+                    };
+                    
+                    transaction.onerror = (event) => {
+                        console.error("Error creating default admin accounts:", event.target.error);
+                        reject(event.target.error);
+                    };
+                });
+            } catch (error) {
+                console.error("Error in createDefaultAdmins:", error);
+                throw error;
+            }
+        }
+        
+        // Initialize empty array for guest data
+        let guestData = [];
+
+        // Pagination settings
+        let currentPage = 1;
+        const itemsPerPage = 5;
+        
+        // DOM Elements
+        const loginForm = document.getElementById('loginForm');
+        const loginError = document.getElementById('loginError');
+        const adminControls = document.getElementById('adminControls');
+        const currentAdminSpan = document.getElementById('currentAdmin');
+        const logoutButton = document.getElementById('logoutButton');
+        const viewDataSection = document.getElementById('viewDataSection');
+        const showLoginModal = document.getElementById('showLoginModal');
+        const closeLoginModal = document.getElementById('closeLoginModal');
+        const guestListSection = document.getElementById('guestListSection');
+        const guestForm = document.getElementById('guestForm');
+        const guestTableBody = document.getElementById('guestTableBody');
+        const noDataDiv = document.getElementById('noData');
+        const searchInput = document.getElementById('searchInput');
+        const pagination = document.getElementById('pagination');
+        const prevPageBtn = document.getElementById('prevPage');
+        const nextPageBtn = document.getElementById('nextPage');
+        const startIndexEl = document.getElementById('startIndex');
+        const endIndexEl = document.getElementById('endIndex');
+        const totalItemsEl = document.getElementById('totalItems');
+        const exportExcelBtn = document.getElementById('exportExcel');
+        const photoInput = document.getElementById('photo');
+        const photoPreview = document.getElementById('photoPreview');
+        const previewImage = document.getElementById('previewImage');
+        
+        // Modal functions
+        function openModal() {
+            loginModal.classList.remove('hidden');
+            setTimeout(() => {
+                modalOverlay.classList.add('active');
+                modalContainer.classList.add('active');
+            }, 10);
+            document.getElementById('username').focus();
+        }
+        
+        function closeModal() {
+            modalOverlay.classList.remove('active');
+            modalContainer.classList.remove('active');
+            setTimeout(() => {
+                loginModal.classList.add('hidden');
+                loginForm.reset();
+                loginError.classList.add('hidden');
+            }, 300);
+        }
+        
+        // Format date for display
+        function formatDate(dateString) {
+            const date = new Date(dateString);
+            const day = date.getDate().toString().padStart(2, '0');
+            const month = (date.getMonth() + 1).toString().padStart(2, '0');
+            const year = date.getFullYear();
+            return `${day}-${month}-${year}`;
+        }
+        
+        // Modal event listeners
+        showLoginModal.addEventListener('click', openModal);
+        closeLoginModal.addEventListener('click', closeModal);
+        modalOverlay.addEventListener('click', closeModal);
+        
+        // Prevent clicks inside the modal from closing it
+        modalContainer.addEventListener('click', (e) => {
+            e.stopPropagation();
+        });
+        
+        // Close modal on Escape key
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && !loginModal.classList.contains('hidden')) {
+                closeModal();
+            }
+        });
+        
+        // Login form submission
+        loginForm.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            
+            // Clear previous errors
+            loginError.classList.add('hidden');
+            loginError.textContent = '';
+            
+            try {
+                // First try authenticating with database
+                let admin = await authenticateAdmin(username, password);
+                
+                // If that fails, try with hard-coded credentials as backup
+                if (!admin) {
+                    admin = DEFAULT_ADMINS.find(a => 
+                        a.username === username && a.password === password
+                    );
+                    
+                    if (admin) {
+                        console.log("Authenticated with fallback credentials");
+                    }
+                }
+                
+                if (admin) {
+                    // Login successful
+                    isLoggedIn = true;
+                    currentAdmin = admin;
+                    
+                    // Save login state to session storage (will be lost when browser is closed)
+                    sessionStorage.setItem('isLoggedIn', 'true');
+                    sessionStorage.setItem('currentAdmin', JSON.stringify(admin));
+                    
+                    // Update UI
+                    currentAdminSpan.textContent = admin.name;
+                    updateUIAfterAuth();
+                    
+                    // Load guest data
+                    await loadGuestsFromDb();
+                    
+                    // Close the modal
+                    closeModal();
+                } else {
+                    // Login failed
+                    loginError.textContent = "Username atau password salah";
+                    loginError.classList.remove('hidden');
+                }
+            } catch (error) {
+                console.error("Login error:", error);
+                loginError.textContent = "Terjadi kesalahan saat login: " + error.message;
+                loginError.classList.remove('hidden');
+            }
+        });
+        
+        // Authenticate admin
+        async function authenticateAdmin(username, password) {
+            return new Promise((resolve, reject) => {
+                if (!db) {
+                    console.warn("Database not initialized during authentication");
+                    resolve(null);
+                    return;
+                }
+                
+                try {
+                    const transaction = db.transaction([ADMIN_STORE], 'readonly');
+                    const store = transaction.objectStore(ADMIN_STORE);
+                    const request = store.get(username);
+                    
+                    request.onsuccess = (event) => {
+                        const admin = event.target.result;
+                        if (admin && admin.password === password) {
+                            resolve(admin);
+                        } else {
+                            resolve(null);
+                        }
+                    };
+                    
+                    request.onerror = (event) => {
+                        console.error("Error authenticating admin:", event.target.error);
+                        resolve(null); // Resolve with null instead of rejecting to allow fallback
+                    };
+                } catch (error) {
+                    console.error("Exception during authentication:", error);
+                    resolve(null); // Resolve with null to allow fallback
+                }
+            });
+        }
+        
+        // Logout handler
+        logoutButton.addEventListener('click', function() {
+            isLoggedIn = false;
+            currentAdmin = null;
+            
+            // Clear login state from session storage
+            sessionStorage.removeItem('isLoggedIn');
+            sessionStorage.removeItem('currentAdmin');
+            
+            // Update UI
+            updateUIAfterAuth();
+        });
+        
+        // Update UI based on authentication state
+        function updateUIAfterAuth() {
+            if (isLoggedIn) {
+                // User is logged in
+                viewDataSection.classList.add('hidden');
+                adminControls.classList.remove('hidden');
+                guestListSection.classList.remove('hidden');
+            } else {
+                // User is not logged in
+                viewDataSection.classList.remove('hidden');
+                adminControls.classList.add('hidden');
+                guestListSection.classList.add('hidden');
+            }
+        }
+        
+        // Photo preview functionality
+        photoInput.addEventListener('change', function(e) {
+            if (this.files && this.files[0]) {
+                const reader = new FileReader();
+                
+                reader.onload = function(e) {
+                    previewImage.src = e.target.result;
+                    photoPreview.classList.remove('hidden');
+                }
+                
+                reader.readAsDataURL(this.files[0]);
+            } else {
+                photoPreview.classList.add('hidden');
+            }
+        });
+        
+        // Add guest form submission handler
+        guestForm.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData(guestForm);
+            
+            // Process photo
+            let photoData = null;
+            if (photoInput.files && photoInput.files[0]) {
+                const reader = new FileReader();
+                photoData = await new Promise((resolve) => {
+                    reader.onload = (e) => resolve(e.target.result);
+                    reader.readAsDataURL(photoInput.files[0]);
+                });
+            }
+            
+            const newGuest = {
+                date: new Date().toISOString().split('T')[0],
+                name: formData.get('name'),
+                institution: formData.get('institution'),
+                email: formData.get('email'),
+                purpose: formData.get('purpose'),
+                photo: photoData
+            };
+            
+            // Save to database
+            try {
+                await addGuestToDb(newGuest);
+                
+                // Show success message
+                const successMessage = document.createElement('div');
+                successMessage.className = 'mt-4 p-3 bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 rounded-md';
+                successMessage.textContent = 'Data tamu berhasil disimpan!';
+                guestForm.appendChild(successMessage);
+                
+                // Remove success message after 3 seconds
+                setTimeout(() => {
+                    successMessage.remove();
+                }, 3000);
+                
+                // Refresh display if user is admin
+                if (isLoggedIn) {
+                    await loadGuestsFromDb();
+                }
+                
+                // Reset form
+                guestForm.reset();
+                photoPreview.classList.add('hidden');
+            } catch (error) {
+                console.error("Error adding guest:", error);
+                
+                // Show error message
+                const errorMessage = document.createElement('div');
+                errorMessage.className = 'mt-4 p-3 bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200 rounded-md';
+                errorMessage.textContent = 'Terjadi kesalahan saat menyimpan data. Silakan coba lagi.';
+                guestForm.appendChild(errorMessage);
+                
+                // Remove error message after 3 seconds
+                setTimeout(() => {
+                    errorMessage.remove();
+                }, 3000);
+            }
+        });
+        
+        // Add guest to database
+        async function addGuestToDb(guest) {
+            return new Promise((resolve, reject) => {
+                try {
+                    const transaction = db.transaction([GUEST_STORE], 'readwrite');
+                    const store = transaction.objectStore(GUEST_STORE);
+                    const request = store.add(guest);
+                    
+                    request.onsuccess = (event) => {
+                        console.log("Guest added to database with ID:", event.target.result);
+                        resolve(event.target.result);
+                    };
+                    
+                    request.onerror = (event) => {
+                        console.error("Error adding guest to database:", event.target.error);
+                        reject(event.target.error);
+                    };
+                } catch (error) {
+                    console.error("Exception adding guest:", error);
+                    reject(error);
+                }
+            });
+        }
+        
+        // Load all guests from database
+        async function loadGuestsFromDb() {
+            return new Promise((resolve, reject) => {
+                try {
+                    const transaction = db.transaction([GUEST_STORE], 'readonly');
+                    const store = transaction.objectStore(GUEST_STORE);
+                    const request = store.getAll();
+                    
+                    request.onsuccess = (event) => {
+                        guestData = event.target.result || [];
+                        // Sort by newest first
+                        guestData.sort((a, b) => new Date(b.date) - new Date(a.date));
+                        renderGuestTable();
+                        resolve(guestData);
+                    };
+                    
+                    request.onerror = (event) => {
+                        console.error("Error loading guests from database:", event.target.error);
+                        guestData = [];
+                        renderGuestTable();
+                        reject(event.target.error);
+                    };
+                } catch (error) {
+                    console.error("Exception loading guests:", error);
+                    guestData = [];
+                    renderGuestTable();
+                    reject(error);
+                }
+            });
+        }
+        
+        // Search functionality
+        searchInput.addEventListener('input', function() {
+            currentPage = 1; // Reset to first page when searching
+            renderGuestTable();
+        });
+        
+        // Pagination click handlers
+        prevPageBtn.addEventListener('click', function() {
+            if (currentPage > 1) {
+                currentPage--;
+                renderGuestTable();
+            }
+        });
+        
+        nextPageBtn.addEventListener('click', function() {
+            const filteredData = getFilteredData();
+            const totalPages = Math.ceil(filteredData.length / itemsPerPage);
+            
+            if (currentPage < totalPages) {
+                currentPage++;
+                renderGuestTable();
+            }
+        });
+        
+        // Export to Excel functionality
+        exportExcelBtn.addEventListener('click', function() {
+            const filteredData = getFilteredData();
+            
+            // Prepare data for export
+            const exportData = filteredData.map((guest, index) => ({
+                'No': index + 1,
+                'Tanggal': formatDate(guest.date),
+                'Nama': guest.name,
+                'Instansi': guest.institution,
+                'Email': guest.email || '-',
+                'Maksud Kunjungan': guest.purpose
+            }));
+            
+            // Create worksheet
+            const ws = XLSX.utils.json_to_sheet(exportData);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'Buku Tamu');
+            
+            // Generate Excel file and trigger download
+            const today = new Date().toISOString().slice(0, 10);
+            XLSX.writeFile(wb, `Buku_Tamu_DPUPR_${today}.xlsx`);
+        });
+        
+        // Get filtered data based on search input
+        function getFilteredData() {
+            const searchTerm = searchInput.value.toLowerCase();
+            
+            if (!searchTerm) {
+                return [...guestData];
+            }
+            
+            return guestData.filter(guest => 
+                guest.name.toLowerCase().includes(searchTerm) ||
+                guest.institution.toLowerCase().includes(searchTerm) ||
+                (guest.email && guest.email.toLowerCase().includes(searchTerm)) ||
+                guest.purpose.toLowerCase().includes(searchTerm)
+            );
+        }
+        
+        // Render the guest table with pagination
+        function renderGuestTable() {
+            const filteredData = getFilteredData();
+            const totalItems = filteredData.length;
+            const totalPages = Math.ceil(totalItems / itemsPerPage);
+            
+            // Ensure current page is within valid range
+            currentPage = Math.max(1, Math.min(currentPage, totalPages || 1));
+            
+            // Calculate start and end indices for current page
+            const startIndex = (currentPage - 1) * itemsPerPage;
+            const endIndex = Math.min(startIndex + itemsPerPage, totalItems);
+            
+            // Display info about visible range
+            startIndexEl.textContent = totalItems > 0 ? startIndex + 1 : 0;
+            endIndexEl.textContent = endIndex;
+            totalItemsEl.textContent = totalItems;
+            
+            // Clear table
+            guestTableBody.innerHTML = '';
+            
+            // Show/hide "no data" message
+            if (totalItems === 0) {
+                noDataDiv.classList.remove('hidden');
+            } else {
+                noDataDiv.classList.add('hidden');
+                
+                // Populate table with current page data
+                for (let i = startIndex; i < endIndex; i++) {
+                    const guest = filteredData[i];
+                    const row = document.createElement('tr');
+                    row.className = 'hover:bg-gray-50 dark:hover:bg-gray-700';
+                    
+                    // Create photo cell
+                    const photoCell = document.createElement('td');
+                    photoCell.className = 'px-6 py-4 whitespace-nowrap';
+                    
+                    if (guest.photo) {
+                        const img = document.createElement('img');
+                        img.src = guest.photo;
+                        img.alt = `Foto ${guest.name}`;
+                        img.className = 'h-12 w-12 rounded-full object-cover';
+                        photoCell.appendChild(img);
+                    } else {
+                        photoCell.innerHTML = `<div class="h-12 w-12 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
+                            <svg class="h-6 w-6 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd"></path>
+                            </svg>
+                        </div>`;
+                    }
+                    
+                    row.innerHTML = `
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">${i + 1}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">${formatDate(guest.date)}</td>
+                    `;
+                    
+                    row.appendChild(photoCell);
+                    
+                    const remainingCells = `
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">${guest.name}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">${guest.institution}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">${guest.email || '-'}</td>
+                        <td class="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">${guest.purpose}</td>
+                    `;
+                    
+                    row.innerHTML += remainingCells;
+                    guestTableBody.appendChild(row);
+                }
+            }
+            
+            // Update pagination buttons
+            prevPageBtn.disabled = currentPage === 1;
+            nextPageBtn.disabled = currentPage === totalPages || totalPages === 0;
+            
+            // Generate pagination buttons
+            renderPagination(totalPages);
+        }
+        
+        // Render pagination buttons
+        function renderPagination(totalPages) {
+            pagination.innerHTML = '';
+            
+            // Determine which page buttons to show
+            let startPage = Math.max(1, currentPage - 2);
+            let endPage = Math.min(totalPages, startPage + 4);
+            
+            if (endPage - startPage < 4 && startPage > 1) {
+                startPage = Math.max(1, endPage - 4);
+            }
+            
+            // First page button
+            if (startPage > 1) {
+                addPageButton(1);
+                
+                if (startPage > 2) {
+                    // Add ellipsis
+                    const ellipsis = document.createElement('span');
+                    ellipsis.className = 'px-3 py-1 text-sm text-gray-700 dark:text-gray-300';
+                    ellipsis.textContent = '...';
+                    pagination.appendChild(ellipsis);
+                }
+            }
+            
+            // Page buttons
+            for (let i = startPage; i <= endPage; i++) {
+                addPageButton(i);
+            }
+            
+            // Last page button
+            if (endPage < totalPages) {
+                if (endPage < totalPages - 1) {
+                    // Add ellipsis
+                    const ellipsis = document.createElement('span');
+                    ellipsis.className = 'px-3 py-1 text-sm text-gray-700 dark:text-gray-300';
+                    ellipsis.textContent = '...';
+                    pagination.appendChild(ellipsis);
+                }
+                
+                addPageButton(totalPages);
+            }
+        }
+        
+        // Create a single pagination button
+        function addPageButton(pageNum) {
+            const button = document.createElement('button');
+            button.className = `px-3 py-1 border border-gray-300 dark:border-gray-600 rounded-md text-sm ${
+                pageNum === currentPage 
+                    ? 'bg-primary text-white' 
+                    : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
+            }`;
+            button.textContent = pageNum;
+            
+            button.addEventListener('click', function() {
+                if (currentPage !== pageNum) {
+                    currentPage = pageNum;
+                    renderGuestTable();
+                }
+            });
+            
+            pagination.appendChild(button);
+        }
+        
+        // Check for existing login in session storage
+        function checkExistingLogin() {
+            const storedIsLoggedIn = sessionStorage.getItem('isLoggedIn');
+            const storedAdmin = sessionStorage.getItem('currentAdmin');
+            
+            if (storedIsLoggedIn === 'true' && storedAdmin) {
+                isLoggedIn = true;
+                currentAdmin = JSON.parse(storedAdmin);
+                currentAdminSpan.textContent = currentAdmin.name;
+                updateUIAfterAuth();
+                
+                // Load guest data if logged in
+                if (isLoggedIn) {
+                    loadGuestsFromDb();
+                }
+            } else {
+                updateUIAfterAuth();
+            }
+        }
+        
+        // Initialize app
+        async function initApp() {
+            try {
+                // Initialize the database
+                await initDatabase();
+                
+                // Check for existing login
+                checkExistingLogin();
+                
+                // Success message for clean database init
+                console.log("App initialized successfully");
+            } catch (error) {
+                console.error("Error initializing app:", error);
+                // Show error message
+                const errorDiv = document.createElement('div');
+                errorDiv.className = 'bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200 p-4 rounded-md mb-6';
+                errorDiv.textContent = "Terjadi kesalahan saat memuat aplikasi. Browser Anda mungkin tidak mendukung fitur penyimpanan lokal.";
+                document.querySelector('.container').prepend(errorDiv);
+            }
+        }
+        
+        // Start the application
+        initApp();
+    </script>
+</body>
+</html>
